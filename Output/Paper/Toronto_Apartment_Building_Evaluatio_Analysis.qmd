@@ -1,0 +1,250 @@
+---
+title: "Toronto apartment building evaluationanalysis"
+author: "Annie Yan"
+format: pdf
+date: 2023-02-03
+date-format: long
+thanks: "Code and data are available at: https://github.com/AnnieYan0807/Toronto_Apartment_Building_Evaluation_Analysis."
+abstract: "Many people encountered problems with apartment selection. In order to provide beneficial suggestions in apartment selections, this report analyzed apartment building evaluation scores under the examination of RentSafeTO relate with location, building age and number of place evaluated. Evaluation data used in this report are fully collected by RentSafeTO."
+output:
+  bookdown::pdf_document2
+toc: FALSE
+bibliography: references.bib
+---
+
+# 1. Introduction
+According to Statistics Canada study, 1.9 million Canadian households lived in condominium units. (@scrinko_2023) The number of apartments increased by 30% to 430,080 households. Apartment buildings accounted for 68% of newly occupied units in Toronto.(@cityoftoronto_2021) The demand for apartment buildings is significantly growing at the time. Many people encountered problems with apartment selection. In order to make beneficial suggestions in apartment selections, this report analyzed apartment building evaluation scores under the examination of RentSafeTO. Several other factors are also considered, including location, building age, and the number of areas evaluated. 
+
+Apartment Building Standard is a bylaw enforcement program established in 2017 that ensures that owners and operators of multi-family dwellings with 3 or more floors or 10 or more units comply with building maintenance standards. (@cityoftorontoopendataportal) The system RentSafeTO disclosed its evaluation data on the Toronto open data portal. It is valuable for us to interpret. 
+
+# 2. Data
+
+## 2.1 Data Source
+
+The majority of the data used in this report are drawn from the "Apartment building evaluation" database. This database was collated and published by Toronto's open data portal under Municipal Licensing & Standards. The latest update of the database drawn in this report is on Jan 31, 2023.
+
+## 2.2 Data Collection
+
+The database includes evaluation scores for buildings registered with RentSafeTO. RentSaftTO is a system works to ensure that owners and operators of apartment buildings in Toronto meets building maintenance standards through initiatives like evaluation. (@cityoftoronto_2023) This database contains building registered earliest as 2017 and latest until 2023.
+
+Evaluation scores recorded in this database are fully collected by RentSafeTO. Bylaw Enforcement officers will inspect several items including common areas, mechanical and security systems, parking and exterior grounds. A score of one to five will be assign with one being the lowest and five being the highest. These detailed scores is also available in the database. If an item is not applicable to the building at the time of inspection, the score will appear blank in the dataset. All buildings must undergo evaluation at least once every three years. (@cityoftoronto_2023)
+
+## 2.3 Data Analysis
+
+```{r,include=FALSE}
+
+
+# setting
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(opendatatoronto)
+library(dplyr)
+library(janitor)
+
+# get package
+package <- show_package("4ef82789-e038-44ef-a478-a8f3590c3eb1")
+package
+
+# get all resources for this package
+resources <- list_package_resources("4ef82789-e038-44ef-a478-a8f3590c3eb1")
+
+# identify datastore resources; by default, Toronto Open Data sets datastore resource format to CSV for non-geospatial and GeoJSON for geospatial resources
+datastore_resources <- filter(resources, tolower(format) %in% c('csv', 'geojson'))
+
+# load the first datastore resource as a sample
+database00 <- filter(datastore_resources, row_number()==1) %>% get_resource()
+data
+
+# Acquire
+write_csv(
+  x = database00,
+  file = "database0.csv"
+)
+
+```
+
+```{r,include=FALSE}
+
+
+# clean data
+database1 <-
+  database00 |>
+  select(RSN, YEAR_BUILT, PROPERTY_TYPE, WARDNAME, NO_OF_AREAS_EVALUATED, SCORE) 
+
+# Change chr to num
+database1$SCORE = as.numeric(database1$SCORE)
+database1$YEAR_BUILT = as.numeric(database1$YEAR_BUILT)
+database1$RSN = as.numeric(database1$RSN)
+database1$NO_OF_AREAS_EVALUATED = as.numeric(database1$NO_OF_AREAS_EVALUATED)
+
+#test
+database1$NO_OF_AREAS_EVALUATED  |> class() == "numeric"
+database1$SCORE |> min() >= 0
+database1$SCORE|> max() <= 100
+```
+
+
+
+```{r,include=FALSE}
+
+# Simulate
+set.seed(853)
+
+simulated_occupancy_data <-
+  tibble(
+    Year_built = rep(x = as.Date("2021-01-01") + c(0:364), times = 3),
+ 
+    Property_type = c(
+      rep(x = "type 1", times = 365),
+      rep(x = "type 2", times = 365),
+      rep(x = "type 3", times = 365)
+    ),
+    
+    Wardname = c(
+      rep(x = "ward 1", times = 365),
+      rep(x = "ward 2", times = 365),
+      rep(x = "ward 3", times = 365)
+    ),
+    
+    Score =
+      rpois(
+        n = 365 * 3,
+        lambda = 30
+      ),
+    
+    No_of_areas_evaluated =
+      rpois(
+        n = 365 * 3,
+        lambda = 30
+      )
+    
+  )
+
+head(simulated_occupancy_data)
+```
+
+
+
+To analysis this dataset, R programing language (@citeR), tidyverse (@citeTidyverse), janitor (@citejanitor), dplyr (@citedplyr), and opendatatoronto (@citeopendata) are used. ggplot2 (@citeggplot2) has been used in order to produce graphic reports. The use of knitr (@citeknitr) helped me to generate tables.
+
+Credit to RentSafeTO and Opendatatoronto, this dataset allows me to take a pike into the correlation between building evaluation scores and several other aspects. These findings, though still have limitations, may be able to help for people who want to find a nice apartment in the future.
+
+The dataset has 40 variables in total that described apartment building conditions. But, for the purpose of this report, we will only utilize a small amount of them. The official explanation of these variables are listed below: (@cityoftorontoopendataportal)
+
+-   YEAR BUILT: This is the year that the building was built in. Information is provided by the Building Owners/Managers.
+
+-   PROPERTY TYPE: This field informs users of whether a building is owed privately, by Toronto Community Housing Corporation (TCHC) or another assisted, social or supportive housing provider.
+
+-   WARDNAME: This is the name of the ward. All data is provided based on the 25 ward system.
+
+-   SCORE: This is the overall score of the building. The score is the sum total of each item that was evaluated. The formula to calculate scores is as follows: sum of all assigned scores during the evaluation / (number of unique items reviewed \*5)
+
+-   NO OF AREAS EVALUATED: This is the number of items that were evaluated during a single evaluation.
+
+Evaluation scores, being one of the essential variables in this database, best illustrate the condition of the apartment buildings. As all the correlation analyses will be conducted related to evaluation scores, I created a graph to give an overview of the entire score distribution. Figure 1, the count of scores in each ward, presents the score distribution with color-coded wards. From figure 1, we can see the highest pike of score count is around 75, with a repetition of approximately 500 times. The lower bond ends at around 37.5, excluding outliners. The higher bond is 100.
+
+```{r}
+#| echo: false
+#| fig-cap-location: bottom
+#| fig-cap: "The count of score in each wards"
+library(knitr)
+library(opendatatoronto)
+
+ database1$SCORE = as.numeric(database1$SCORE)
+ 
+database1 %>%
+  ggplot(mapping = aes(x = SCORE, fill = WARDNAME)) +
+  geom_bar()
+
+```
+
+However, due to a large amount of data, the measurement is not very clear in the graph. Thus, I calculated the mean, median and standard deviation of scores. Similar to figure 1 shown, the median of all scores is 74. The mean of all scores is 73.77, with a standard deviation of 10.55. Above are some measurements of scores of the entire population. These measurements will be helpful in later analysis.
+
+```{r}
+#| echo: false
+#| tbl-cap-location: bottom
+#| tbl-cap: "Measurement of entire population"
+
+library(knitr)
+library(opendatatoronto)
+library(dplyr)
+
+ 
+database1 |>
+  select(SCORE) |>
+  summarize (MEAN = mean( SCORE, na.rm=TRUE), 
+             MEDIAN = median(SCORE, na.rm =TRUE),
+             STANDARD_DEVIATION= sd(SCORE, na.rm=FALSE)) |>
+
+  knitr::kable()
+
+```
+
+The first aspect I examine with its relationship to building evaluation scores is ward location. As shown in Table 2 below, there are 14 wards in total. Scarborough North has the highest mean evaluation score of 84.56. That is 10.79 above the mean score of the entire population. Don Valley North, in second place, has an average building evaluation score of 82.19, which is 8.42 above the mean score of the population. Ward Scarborough-Agincourt has the third-highest mean score of 80.44. From this table, we may suspect that these three wards have a relatively higher standard of apartment buildings. 
+
+In contrast, Humber River-Black Creek (69.85), Etobicoke North (69.92), and Davenport (69.97) are the three wards that have the lowest average scores. They are all significantly lower than the mean score of the entire population of 73.77. That may suggest apartment buildings in these three areas will be a bigger chance of having a low evaluation score. 
+
+```{r}
+#| echo: false
+#| tbl-cap-location: bottom
+#| tbl-cap: "Mean score of different wards"
+
+library(knitr)
+library(opendatatoronto)
+ database1$SCORE = as.numeric(database1$SCORE)
+ 
+database1 |>
+  select(WARDNAME,SCORE) |>
+  group_by (WARDNAME) |>
+  summarize (MEAN = mean( SCORE, na.rm=TRUE)) |>
+  
+
+  knitr::kable()
+
+```
+
+Apart from location, the age of the building is also a factor that may affect evolution scores. Due to the distribution of figure 2: Evaluation score related to year apartment built, we have a reason to suspect that there is a correlation between the year buildings were built and the evolution scores. A reasonable hypothesis for the relationship between these two variables is the early the apartment buildings were built, the lower the evolution scores, and vice versa. However, this is an untested hypothesis. A later test is needed to confirm the such correlation. 
+
+```{r}
+#| message: false
+#| warning: false
+#| echo: false
+#| fig-cap: "Evaluation score relate to year apartment built"
+#| label: fig1
+
+
+database1 %>%
+  ggplot(aes(x=SCORE,
+             y=YEAR_BUILT,
+             color = PROPERTY_TYPE))+
+  geom_point()
+```
+
+Last but not least, I examine the no of areas evaluated. According to figure 3, apartment buildings will most likely have 18 areas for evaluation, including the entrance lobby, security, laundry rooms, garbage chute rooms, and others. The majority of the apartment building will have 15 to 19 areas that need to be evaluated. Only a small number of apartment buildings will have 0 to 12 areas to evaluate. 
+
+```{r}
+#| message: false
+#| warning: false
+#| echo: false
+#| fig-cap: "Count of number of areas evaluated"
+#| label: fig2
+
+
+database1$SCORE = as.numeric(database1$SCORE)
+
+
+database1 %>%
+  ggplot(mapping = aes(x = NO_OF_AREAS_EVALUATED)) +
+  geom_bar() +
+  theme_classic()
+```
+
+# 3. Result
+Overall, the dataset “Apartment building evaluation” is helpful in this report to analyze some potential factors that could affect an apartment building evaluation score. This information, though further testing is still needed, is worth considering in future apartment selections. In conclusion, among the 14 wards in Toronto, Scarborough North, Don Valley North, and Ward Scarborough-Agincourt will most likely have a higher quality apartment building under the standard of RentSafeTO apartment building evaluation. On the other hand, apartment buildings located in Humber River-Black Creek, Etobicoke North, and Davenport may have a larger chance of having lower quality. Other than that, building age may have a negative correlation with buildings evaluation scores. Apartment buildings that have been built in recent years tend to have higher evaluation scores. Lastly, an apartment building that has around 15 to 18 areas in the list of areas RentSafeTO evaluating is at a normal range. Apartment buildings that have a lower number of areas evaluated may have fewer facilities. This information will be helpful in selecting future apartments.  
+
+# 4. Limitation and improvement
+As frequently mentioned above, this report does have limitations and restrictions. Firstly, the dataset only includes registered from 2017 until 2023. Bias may exist in the data collection process. Secondly, this dataset is solely provided by the RentSafeTO system. The score does not fully represent the quality of the building. The score only explains the performance of this apartment building under the standard of the RentSafeTO examination. Thirdly, further testing is needed for the results of the analysis. To testify the correlation between the year the building was built and the evolution scores, correlation coefficient calculation, and T-test needs to be conducted. Fourthly, due to the lack of information, we can not estimate the relationship between the number of areas RentSafeTO evaluated and the level of facilities. Lastly, correlation does not mean causation. The variables mentioned in this report may or may not affect the evolution scores of the apartment buildings. To confirm causation, an experiment needs to be conducted in a controlled environment. In the end, although these limitations and restrictions exist, the analysis results of this report are still worth considering in future apartment selections. It may be helpful for people to choose a high-quality apartment building under the standard of RentSafeTO.
+
+
+# References
