@@ -1,2 +1,0 @@
-# Toronto_Apartment_Building_Evaluation_Analysis
-Toronto_Apartment_Building_Evaluation_Analysis
